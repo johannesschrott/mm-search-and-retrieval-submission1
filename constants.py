@@ -1,0 +1,6 @@
+IDS_PATH = "data/id_information_mmsr.tsv"
+GENRES_PATH = "data/id_genres_mmsr.tsv"
+PROGRAM_NAME = "Multimedia Search and Retrieval WS2022, Group C"
+TFIDF_PATH = "data/id_lyrics_tf-idf_mmsr.tsv"
+WORD2VEC_PATH = "data/id_lyrics_word2vec_mmsr.tsv"
+BERT_PATH = "data/id_bert_mmsr.tsv"
