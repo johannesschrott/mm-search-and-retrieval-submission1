@@ -9,6 +9,8 @@ class Genres:
     def __init__(self):
         print("init genres from ", constants.GENRES_PATH)
         self.genres = pd.read_csv(filepath_or_buffer=constants.GENRES_PATH, sep="\t",index_col=0, header=0)
+        self.genres_row = self.genres.reset_index()
+
         """.transpose()"""
         #print("self.genres: ", self.genres)
 
@@ -16,6 +18,7 @@ class Genres:
         """Returns the genres for a specific song which is specified by its ID."""
         print("getGenreForId")
         return self.genres[_id]
+
 
     def getAllGenres(self):
         print("getAllGenres")
