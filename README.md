@@ -1,4 +1,4 @@
-# Multimedia Search and Retrieval Project
+# Multimedia Search and Retrieval Project - Submission 2
 
 Group C. Members:
 
