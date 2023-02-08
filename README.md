@@ -12,7 +12,7 @@ Group C. Members:
 All features (.tsv files from moodle) as well as the database containing the similarities MUST be placed in the directory `data` on the top level of this repositiory. The file `constants.py` provides the possibility to look up the paths
 and some other constants and also allows adjusting them.
 Due to their size, all files in the `data` directory are NOT pushed to GitHub. 
-The similarity database can be computed with the `main.py` file (see below how to do so) or can be obtained from us (please write an email; be aware that the size of the database is around 13 GB).
+The similarity database can be computed with the `main.py` file (see below how to do so) or can be obtained from us (please write an email; be aware that the size of the database is around 16 GB). Without the similarity database the web app does not work.
 
 ## How to run the project
 
@@ -25,17 +25,19 @@ and an artist/song title.
 
 The available similarity functions and feature types can be retrieved when running `main.py` without any arguments.
 
-The Artist/Songname parameter is a string containing 1. the artist's name, 2. a semicolon and 3. the song title.
+The Artist/Songname parameter is a string containing 1. the artist's name, 2. a semicolon and 3. the song title. Attention! This string is case dependendent. In case of errors, check via the web-app, if the artist and or the title are spelled correctly. This parameter can also be set to `batch` for batch runs (configured in `constants.py`) or to `all` for running the whole dataset.
 
 Example:
-`python3 main.py tf-idf cosine "Nirvana;Come As You Are"`
+`python3 main.py tf-idf cosine "Nirvana;Come as You Are"`
 
-`python3 main.py late cosine "Nirvana;Come As You Are"` 
+`python3 main.py late cosine "Nirvana;Come as You Are"` 
 
 Because of parameter 'late': uses the feature + similarity function combinations found to be best suited for borda count and specified in `__init__.py` (see below)
 
 Parameter 'cosine' (i.e. the similarity function) is ignored, as soon as 'late' is used.
 'late' cannot be used together with batch or all.
+
+In terms of evaluation, `main.py`calculates the precision, the MRR, the NDCG and the %DeltaMean, each @10 and @100.
 
 ### `statistics_main.py`: Compute statistics over the dataset
 Run this python script without any arguments to compute some statistics over the dataset. A discussion of the results of the script is done in the project report.
@@ -48,16 +50,30 @@ In a second run `app.run_server(debug=False)` must to be uncommented and `get_pr
 The website this webserver delivers contains an interactive plot where all shown curves can be ticked on or off individually.
 
 
-### `rank_order_correlations.py`: Rank order correlations 
+### `calculate_correlation_plots.py`: Rank order correlations 
 
 This python script computes rank order correlations between all possible combinations between features and similarity functions. Simply run this file without any arguments, the results will be printed to the console.
-Inside the script the variable `nr_of_songs` defines the number of songs of which the correlations are calculated. As a result always the mean of all songs for a specific k is returned.
+Inside the script the variable `nr_of_songs` defines the number of songs of which the correlations are calculated. As a result always the mean of all songs for a specific k is returned. A Jupyter notebook `plot_correlation_plots.ipynb` is also available, but please not that the notebook currently is using logarithm for coloring the plot, which is due to negative correlations resulting in transparent colorings.
+
+### `hubness_main.py`
+Hubness values are not calculated when doing the evaluation by running `main.py`, instead they are calculated through running this seperate file without any parameters. The result is printed to the console.
+
+### `webapp.py`
+The Web App for the similarity based music retireval system is based on the Dash framework.  Just run the file `webapp.py`without any parameters and a local development server running the web app will be started.
 
 ## How to specifiy which features + similarity function combinations are used for borda count
 In __init__.py specify them in the array LATE_FUSION_LABEL_FEATURESTYPE_FUNCS_AND_PATHS.
 Each array entry shall have the form (label, FeaturesType, similarityFunction, featuresPathFromConstants).
 label is arbitrary and used as column header in the dataframe with fused scores and also for printing to the terminal and writing into the results csv-file (templ_lateFusion_sortedByMean.csv and temp_lateFusion_notSorted.csv).
 FeaturesType.<FEATURE_TYPE_NAME> must fit constants.<FEATURE_FILE_PATH>.
+
+
+## Creation of early fusion files
+
+EarlyModalities (Pre_PCA_INCP_BERT_VDS_SCALED.csv) is created by executing the early_fusion.py script. To create the EarlyLyrics and EarlyAudio files execute all cells
+of Early_Fusion_Generation.ipynb. All base feature TSV files must be located in the /data dictionary of the project.
+
+
 
 Example of 2 voters:
 `LATE_FUSION_LABEL_FEATURESTYPE_FUNCS_AND_PATHS = [('COSINE BLF_CORRELATION', FeaturesType.BLF_CORRELATION, Cos_sim(), constants.AUDIO_BLF_CORRELATION_PATH),`
