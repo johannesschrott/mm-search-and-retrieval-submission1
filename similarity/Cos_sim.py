@@ -66,12 +66,23 @@ class Cos_sim:
                 nans = np.isnan(result_row).sum()
 
                 try:
-                    for similarity_index in np.argpartition(result_row, -(nrResults+1+nans))[-(nrResults+1+nans):]: # gets the nrResults indices of the largest elements
-                        song2id = int(similarity_index)
-                        if song1id != song2id:
-                          values_for_db.append((song1id, song2id, float(result_row[similarity_index]), similarity.SimilarityFunctionType.COSINE_SIMILARITY.value, featuresType.value))
-                        # float and int conversions are needed so that SQLite stores in the correct data type
+                    if nrResults == constants.NR_OF_SONGS:
+                        for similarity_index in range(0, nrResults):  # gets the nrResults indices of the largest elements
+                            song2id = int(similarity_index)
+                            if song1id != song2id:
+                                values_for_db.append((song1id, song2id, float(result_row[similarity_index]),
+                                                      similarity.SimilarityFunctionType.COSINE_SIMILARITY.value,
+                                                      featuresType.value))
+                            # float and int conversions are needed so that SQLite stores in the correct data type
+                    else:
+                        for similarity_index in np.argpartition(result_row, -(nrResults+1+nans))[-(nrResults+1+nans):]: # gets the nrResults indices of the largest elements
+                            song2id = int(similarity_index)
+                            if song1id != song2id:
+                              values_for_db.append((song1id, song2id, float(result_row[similarity_index]), similarity.SimilarityFunctionType.COSINE_SIMILARITY.value, featuresType.value))
+                            # float and int conversions are needed so that SQLite stores in the correct data type
+
                 except ValueError as e:
+                    print('Error: ', e)
                     #print(result_row[similarity_index])
                     #print(similarity.SimilarityFunctionType.COSINE_SIMILARITY.value)
                     #print(featuresType.value)

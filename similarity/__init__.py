@@ -7,7 +7,6 @@ from similarity.Cos_sim import Cos_sim
 from similarity.Inner_product import Inner_product
 import pandas as pd
 
-
 class FeaturesType(Enum):
     """Enum that provides all possible feature types (for usage in parameters)"""
     LYRICS_TF_IDF = 0
@@ -25,6 +24,10 @@ class FeaturesType(Enum):
     RESNET = 12
     VGG19 = 13
     BLF_SPECTRAL = 14
+    EARLY = 25
+    LATE = 26
+    EARLY_W2V_BERT = 27
+    EARLY_ESSENTIA_VDS = 28
 
 
 
@@ -38,8 +41,23 @@ class SimilarityFunctionType(Enum):
     BASELINE = 4
 
 
+# (label, FeaturesType, similarityFunction, featuresPathFromConstants)
+LATE_FUSION_LABEL_FEATURESTYPE_FUNCS_AND_PATHS = [('COSINE BLF_CORRELATION', FeaturesType.BLF_CORRELATION, Cos_sim(), constants.AUDIO_BLF_CORRELATION_PATH),
+                               ('COSINE BLF_DELTASPECTRAL', FeaturesType.BLF_DELTASPECTRAL, Cos_sim(), constants.AUDIO_BLF_DELTASPECTRAL_PATH),
+                               ('COSINE BLF_LOGFLUC', FeaturesType.BLF_LOGFLUC, Cos_sim(), constants.AUDIO_BLF_LOGFLUC_PATH),
+                               ('INNER_PRODUCT BLF_SPECTRALCONTRAST', FeaturesType.BLF_SPECTRALCONTRAST, Inner_product(), constants.AUDIO_BLF_SPECTRALCONTRAST_PATH),
+                               ('COSINE BLF_VARDELTASPECTRAL', FeaturesType.BLF_VARDELTASPECTRAL, Cos_sim(), constants.AUDIO_BLF_VARDELTASPECTRAL_PATH),
+                               ('COSINE ESSENTIA', FeaturesType.ESSENTIA, Cos_sim(), constants.AUDIO_ESSENTIA_PATH),
+                               ('JACCARD ESSENTIA', FeaturesType.ESSENTIA, Jaccard(), constants.AUDIO_ESSENTIA_PATH)]
 
 
+# returns <nrResults> best documents for selected similarityFunction or baseline,
+# if FeaturesType.LATE is selected as featuresType, an array of <nrResults> best documents
+# (1 array per voter) are returned.
+# a "voter" is defined as feature+similarity function combination from variable
+# LATE_FUSION_LABEL_FEATURESTYPE_FUNCS_AND_PATHS.
+# similarityFunctionType parameter is ignored, if featuresType == FeaturesType.Late, as also given by
+# LATE_FUSION_LABEL_FEATURESTYPE_FUNCS_AND_PATHS.
 def doQueryWithId(queryId: str, nrResults: int, featuresType: FeaturesType,
                   similarityFunctionType: SimilarityFunctionType):
 
@@ -80,6 +98,14 @@ def doQueryWithId(queryId: str, nrResults: int, featuresType: FeaturesType,
             featuresPath = constants.AUDIO_MFCC_STATS_PATH
         case FeaturesType.RESNET:
             featuresPath = constants.VIDEO_RESNET_PATH
+        case FeaturesType.EARLY:
+            featuresPath = constants.EARLY_PATH
+        case FeaturesType.LATE:
+            featuresPath = None
+        case FeaturesType.EARLY_ESSENTIA_VDS:
+            featuresPath = constants.EARLY_ESSENTIA_VARDELTASPECTRAL
+        case FeaturesType.EARLY_W2V_BERT:
+            featuresPath = constants.EARLY_LYRICS_W2V_BERT
 
     match similarityFunctionType:
         case SimilarityFunctionType.JACCARD:
@@ -90,7 +116,17 @@ def doQueryWithId(queryId: str, nrResults: int, featuresType: FeaturesType,
             similarityFunction = Inner_product()
 
     if (similarityFunctionType.value != SimilarityFunctionType.BASELINE.value):
-        result = similarityFunction.computeHighestSimilaritiesWithMatrix(queryId, nrResults, featuresType, featuresPath)
+        if featuresType != FeaturesType.LATE: # on similarity function + features selection
+            result = similarityFunction.computeHighestSimilaritiesWithMatrix(queryId, nrResults, featuresType, featuresPath)
+            return result.head(nrResults)  # return only the `nrResult` best documents (max. 100)
+        else:  # best suited combination of similarity functions + features
+            result = []
+            for featureSimCombo in LATE_FUSION_LABEL_FEATURESTYPE_FUNCS_AND_PATHS:
+                # featureSimCombo: (label, FeaturesType, similarityFunction, featuresPathFromConstants)
+                nextResult = featureSimCombo[2].computeHighestSimilaritiesWithMatrix(queryId, nrResults, featureSimCombo[1], featureSimCombo[3])
+                result.append(nextResult.head(nrResults)) # return only the `nrResult` best documents (max. 100) PER similarity+feature combo
+            return result
+
     else:
         # The very dumb baseline approach
         # iţaussumes all songs with genre rock are similar on the same level
@@ -111,16 +147,11 @@ def doQueryWithId(queryId: str, nrResults: int, featuresType: FeaturesType,
 
         result = pd.DataFrame()
         ids = [result[0] for result in result_list]
-        similarity_values = [1 for result in result_list]
+        similarity_values = [1.0 for result in result_list]
 
         result["id"] = ids
         result["similarity"] = similarity_values
-            
 
-
-
-
-
-    return result.head(nrResults)  # return only the `nrResult` best documents (max. 100)
+        return result.head(nrResults)  # return only the `nrResult` best documents (max. 100)
 
 

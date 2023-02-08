@@ -15,7 +15,11 @@ AUDIO_MFCC_STATS_PATH = "data/id_mfcc_stats_mmsr.tsv"
 VIDEO_INCP_PATH = "data/id_incp_mmsr.tsv"
 VIDEO_RESNET_PATH = "data/id_resnet_mmsr.tsv"
 VIDEO_VGG19_PATH = "data/id_vgg19_mmsr.tsv"
-
+YOUTUBE_URL_PATH = "data/id_url_mmsr.tsv"
+SPOTIFY_METADATA_PATH = "data/id_metadata_mmsr.tsv"
+EARLY_PATH = "data/bert_resnet_vardeltaspectral.tsv"
+EARLY_LYRICS_W2V_BERT = "data/BERT_W2V_TFIDF.csv"
+EARLY_ESSENTIA_VARDELTASPECTRAL = "data/essentia_VDS.csv"
 
 NR_OF_SONGS = 68641
 
@@ -41,4 +45,13 @@ ROW_SONG_SIMILARITIES_SIMILARITY_TYPE = "similarityType"
 ROW_SONG_SIMILARITIES_FEATURE_TYPE = "featureType"
 
 # Constant for computing whole db of similarities
-NEWSIMILARITIES = True
+NEWSIMILARITIES = False
+BATCH_COUNT = 5
+BATCH_SIZE = 100
+
+############
+# Web App  #
+############
+WEB_DROPDOWN_SELECT_PLACEHOLDER = "Enter the title or artist of a song"
+WEB_DROPDOWN_NR_OF_SUGGESTIONS = 10
+WEB_APP_PRODUCTION = True

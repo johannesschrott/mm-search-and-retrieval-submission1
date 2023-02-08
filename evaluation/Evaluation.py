@@ -1,50 +1,55 @@
 # from rank_eval import Qrels, Run, evaluate
+import ast
+import logging
+
 import pandas as pd
 import statistics
 import sklearn as sk
 import numpy as np
+import constants
+from ast import literal_eval
 
 import database
 from evaluation.Genres import Genres
 
 class Evaluation:
 
-    # for task 1 relevant songs are those sharing at least 1 genre with the query song's genres
-    # returns a data frame with id/index = song id and data row being the genre-list of the compared song (all the genres, not only the equal ones)
-    # the querySong's id is excluded from the returned data frame!
+    # returns the indices of songs sharing at least one genre, performance optimized - no more string splitting needed.
+    # the query song is excluded from the result.
+    def getGenreSharingSongsFromId(self, querySongId: str, splitGenres: pd.DataFrame):
+        # print('getGenreSharingSongsFromId')
+        splitGenresCopy = splitGenres.copy(deep=True)
 
-    # TODO: this is called about once per evaluation metric per query song. -> potential for optimization
-    def getGenreSharingSongsFromId(self, querySongId: str, preLoadedGenres: pd.DataFrame):
-        genresOfQuerySong = preLoadedGenres['genre'][querySongId]
+        # print('for query song id: ', querySongId)
 
+        genresOfQuerySong = splitGenresCopy['genre'][querySongId]
+        genresListOfQuerySong = ast.literal_eval(genresOfQuerySong)
+        # print('converted genres line of query song: ', genresListOfQuerySong)
 
-        genresOfQuerySong = genresOfQuerySong.replace('[', '')
-        genresOfQuerySong = genresOfQuerySong.replace(']', '')
-        genresOfQuerySong = genresOfQuerySong.replace('\'', '')
-        genresOfQuerySong = genresOfQuerySong.strip(" ").split(', ')
+        splitGenresCopy.drop(index=querySongId, inplace=True)  # exclude the song itself from the dataframe, where it is searched for those sharing genres
+        # print('removed line in copied df')
 
+        splitGenresCopy["genre"] = splitGenresCopy["genre"].values.tolist()
 
-        songsSharingGenre = preLoadedGenres[preLoadedGenres.apply(lambda s: i in s for i in genresOfQuerySong).any(axis=1)]
-        songsSharingGenre.drop(index=querySongId)
+        filteredDF = splitGenresCopy[
+            splitGenresCopy['genre'].apply(lambda s: i in s for i in genresListOfQuerySong).any(axis=1)]
 
-        songsSharingGenre.index.drop_duplicates(keep='first')
-        songsSharingGenreIds = songsSharingGenre.index
+        return filteredDF.index
 
+    # dummy implementation: no longer any string splitting needed, later calls of getGenreSharingSongsFromId use literal_eval on column content of format ['genre1', 'genre2']
+    def splitGenresForAllSongs(self, preLoadedGenres: pd.DataFrame):
+        preLoadedGenres.reset_index()
+        return preLoadedGenres
 
-        #print('songs that share genres with query song (', querySongId, '): ', songsSharingGenre)
-        #print('song ids that share genres with query song (', querySongId, '): ', songsSharingGenreIds)
-        return songsSharingGenreIds
-
-
-    def calcPrecisionForQuery(self, querySongId: str, retrievedIds: list[str], preLoadedGenres: pd.DataFrame):
-        songsSharingGenreIds = self.getGenreSharingSongsFromId(querySongId, preLoadedGenres)
+    def calcPrecisionForQuery(self, querySongId: str, retrievedIds: list[str], splitGenres: pd.DataFrame):
+        songsSharingGenreIds = self.getGenreSharingSongsFromId(querySongId, splitGenres)
 
         #print('\ncalcPrecisionForQuery QUERY ID: ', querySongId, ' RETRIEVED SONG IDS count: ', len(retrievedIds))
         return self.calcPrecision(retrievedIds, songsSharingGenreIds)
 
     # k is a size/length. indices start at 0, i.e. runs through entries with indices [0..k-1] or through subset [0:k] (start at entry 0 with length k)
-    def calcPrecisionAtKForQuery(self, querySongId: str, retrievedIds: list[str], preLoadedGenres: pd.DataFrame, k: int):
-        songsSharingGenreIds = self.getGenreSharingSongsFromId(querySongId, preLoadedGenres)
+    def calcPrecisionAtKForQuery(self, querySongId: str, retrievedIds: list[str], splitGenres: pd.DataFrame, k: int):
+        songsSharingGenreIds = self.getGenreSharingSongsFromId(querySongId, splitGenres)
 
         #print('\ncalcPrecisionAtKForQuery QUERY ID: ', querySongId, ' RETRIEVED SONG IDS: ', retrievedIds, 'k: ', k)
         return self.calcPrecisionAtK(retrievedIds, songsSharingGenreIds, k)
@@ -85,8 +90,8 @@ class Evaluation:
         return self.calcBinaryRank(retrievedIds, relevantIds);
 
     # measure, that is performed on one query
-    def calcAveragePrecision(self, querySongId: str, retrievedIds: list[str], preLoadedGenres: pd.DataFrame):
-        songsSharingGenreIds = self.getGenreSharingSongsFromId(querySongId, preLoadedGenres)
+    def calcAveragePrecision(self, querySongId: str, retrievedIds: list[str], splitGenres: pd.DataFrame):
+        songsSharingGenreIds = self.getGenreSharingSongsFromId(querySongId, splitGenres)
         precisionsAtI = self.calcPrecisionsAtI(retrievedIds, songsSharingGenreIds)
         relevances = self.calcRelevances(retrievedIds, songsSharingGenreIds)
         averagePrecision = self.calcAveragePrecisionByFormula(retrievedIds, songsSharingGenreIds, relevances, precisionsAtI)
@@ -155,9 +160,9 @@ class Evaluation:
 
     # returns Reciprocal Rank (can be 0, if no retrieved entries were relevant), or returns 0 if no relevant entries exist or if no entries were retrieved
     # TODO this is called twice per query song (1x for rrAt10, 1x for rrAt100) -> maybe optimization possible
-    def calcRRForQuery(self, querySongId: str, xTopRetrievedIds: list[str], preLoadedGenres: pd.DataFrame):
+    def calcRRForQuery(self, querySongId: str, xTopRetrievedIds: list[str], splitGenres: pd.DataFrame):
         #print('\ncalcRRForQuery QUERY ID: ', querySongId, ' RETRIEVED SONG IDS count: ', len(xTopRetrievedIds))
-        songsSharingGenreIds = self.getGenreSharingSongsFromId(querySongId, preLoadedGenres)
+        songsSharingGenreIds = self.getGenreSharingSongsFromId(querySongId, splitGenres)
 
         retrieved = xTopRetrievedIds  # always a maximum count of 100 for TOP 100, 50 for TOP 50 etc.
         relevant = songsSharingGenreIds  # could be more than 100 for TOP 100, 50 for TOP 50, as currently not ranked/equally sorted, also restricting them to TOP x can falsify the precision
@@ -181,13 +186,35 @@ class Evaluation:
     def calcMAP(self, averagePrecisionsByQuery: list[float]): # one average precision per query
         return statistics.mean(averagePrecisionsByQuery)
 
-    def calcNDCG(self, querySongId: str, retrievedSongs: pd.DataFrame, preLoadedGenres: pd.DataFrame, ids: list[str]):
+    def calcNDCG(self, querySongId: str, retrievedSongs: pd.DataFrame, splitGenres: pd.DataFrame, ids: list[str]):
 
 
-        relevantSongsSharingGenreIds = self.getGenreSharingSongsFromId(querySongId, preLoadedGenres)
+        relevantSongsSharingGenreIds = self.getGenreSharingSongsFromId(querySongId, splitGenres)
 
         retrieved = list(map(lambda x: x if isinstance(x, float) else x[0][0], retrievedSongs["similarity"].values))
         relevant = list(map(lambda id: int(id in relevantSongsSharingGenreIds), retrievedSongs["id"].values))
         # all songs sharing at least one common genre are seen with the same level of relevance (1)
 
         return sk.metrics.ndcg_score([np.asarray(relevant)], [np.asarray(retrieved)])
+
+    def calcNDCGAfterLateFusion(self, querySongId: str, retrievedSongs: pd.DataFrame, splitGenres: pd.DataFrame, ids: list[str]):
+
+
+        relevantSongsSharingGenreIds = self.getGenreSharingSongsFromId(querySongId, splitGenres)
+
+        retrieved = list(map(lambda x: x if isinstance(x, float) else x[0][0], retrievedSongs["meanScore"].values))
+        relevant = list(map(lambda id: int(id in relevantSongsSharingGenreIds), retrievedSongs["id"].values))
+        # all songs sharing at least one common genre are seen with the same level of relevance (1)
+
+        return sk.metrics.ndcg_score([np.asarray(relevant)], [np.asarray(retrieved)])
+
+
+    def percentDeltaMean(self,querySongId: str, xTopRetrievedIds: list[str], spotifyList: pd.DataFrame) -> float:
+        retrievedPopularities = list(self.getSpotifyPopularityForId(songId, spotifyList) for songId in xTopRetrievedIds)
+        queryPopularity = self.getSpotifyPopularityForId(querySongId, spotifyList)
+        return 0.0 if queryPopularity == 0.0 else (statistics.mean(retrievedPopularities)-queryPopularity)/queryPopularity
+
+    def getSpotifyPopularityForId(self, id: str, ids: pd.DataFrame) -> float:
+        """Helping function that returns the id of a specific song that is specified by a string."""
+        #ids = pd.read_csv(constants.SPOTIFY_METADATA_PATH, sep="\t", index_col=0, header=0)
+        return ids.loc[id]['popularity']

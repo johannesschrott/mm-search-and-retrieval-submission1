@@ -1,4 +1,6 @@
 import logging
+import statistics
+
 import pandas as pd
 import sqlite3
 import constants
@@ -161,6 +163,59 @@ def get_n_best_similarity_values(song1: int, n:int, similarityType: int, feature
     connection.close()
 
     return result
+
+def get_hubness_at_k(k: int, similarityType: int, featureType: int) -> float:
+    assert 1 <= k <= 100
+    connection = sqlite3.connect(constants.DATABASE_PATH)
+    cur = connection.cursor()
+
+    try:
+        if k == 100: # when k is 100, the subquery of limiting the best k results can be omitted for speedup
+            cur.execute(f"""
+            Select
+    count(song2Id)  as kOccurencesAt100, song2Id, featureType, similarityType
+from song_similarities
+where featureType = {featureType}
+  and similarityType = {similarityType}
+group by song2Id, featureType, similarityType;
+            """)
+
+        elif 0 < k and k < 100:
+            cur.execute(f"""
+            Select
+    count(song2Id) as kOccurencesAt10, song2Id, featureType, similarityType
+from (select * from (
+    select song1Id,
+           song2Id,
+           similarityValue,
+           similarityType,
+           featureType,
+           row_number() over (PARTITION BY song1Id order by similarityValue desc) as place
+      from song_similarities
+      where similarityType = {similarityType}
+        and featureType =  {featureType})
+    where place <= {k})
+group by song2Id, featureType, similarityType;
+            """)
+        result = cur.fetchall()
+
+    except sqlite3.OperationalError:
+        print("Error on receiving k_occurences from database")
+        return 0.0
+
+    n_k_list = list((row[0] for row in result)) # sqlite returns a list of tuples whith one element
+
+    mean = statistics.mean(n_k_list)
+    stdev = statistics.stdev(n_k_list)
+
+    expected_value = statistics.mean(list(((n_k-mean)**3) for n_k in n_k_list))
+
+    hubness = 0 if (stdev ** 3) == 0.0 else expected_value / (stdev ** 3)
+
+    return hubness
+
+
+
 
 ################
 # Table Create #
